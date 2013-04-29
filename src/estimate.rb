@@ -90,53 +90,33 @@ def linear(x, coeffs)
   coeffs[0]+coeffs[1]*x
 end
 
-def estimate_by_doubly_robust_zero(data, theta)
-  zero = data.select{|datum| datum[2] == 0}
-  coeffs = estimate_regression_coeffs(zero)
+def estimate_by_doubly_robust(data, theta, one)
+  z = one ? 1 : 0
+  regression_data = data.select{|datum| datum[2] == z}
+  coeffs = estimate_regression_coeffs(regression_data)
   numerator = 0.0
   denominator = 0.0
   data.each{|datum|
     propensity = logistic(theta, datum[0])
     regression = linear(datum[0], coeffs)
-    correction = 1.0-propensity
-    if datum[2] == 0
+    correction = one ? propensity : 1.0-propensity
+    if datum[2] == z
       numerator += datum[1]/correction
       numerator += (1.0-1.0/correction)*regression
       denominator += 1.0/correction
-    elsif datum[2] == 1
+    elsif datum[2] == 1-z
       numerator += regression
       denominator += 1.0
     end
   }
-  numerator/denominator
-  numerator/data.length
-end
-
-def estimate_by_doubly_robust_one(data, theta)
-  one = data.select{|datum| datum[2] == 1}
-  coeffs  = estimate_regression_coeffs(one)
-  numerator = 0.0
-  denominator = 0.0
-  data.each{|datum|
-    propensity = logistic(theta, datum[0])
-    regression = linear(datum[0], coeffs)
-    if datum[2] == 0
-      numerator += regression
-      denominator += 1.0
-    elsif datum[2] == 1
-      numerator += datum[1]/propensity
-      numerator += (1.0-1.0/propensity)*regression
-      denominator += 1.0/propensity
-    end
-  }
-  numerator/denominator
+#  numerator/denominator
   numerator/data.length
 end
 
 def doubly_robust(data)
   theta = estimate_theta(data)
-  estimate = [estimate_by_doubly_robust_zero(data, theta),
-              estimate_by_doubly_robust_one(data, theta)]
+  estimate = [estimate_by_doubly_robust(data, theta, false),
+              estimate_by_doubly_robust(data, theta, true)]
   estimate << estimate[1] - estimate[0]
   estimate
 end
