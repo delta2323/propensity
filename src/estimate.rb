@@ -55,7 +55,7 @@ def gradient(data, theta)
   }
 end
 
-def estimate_theta(data)
+def estimate_logistic_parameter(data)
   lo = -5.0
   hi = 5.0
   50.times {
@@ -65,11 +65,19 @@ def estimate_theta(data)
   lo
 end
 
-def estimate_by_propensity(data, theta, one)
+def estimate_propensity(parameter, method, datum)
+  if method == :const
+    return 1
+  elsif method == :logistic
+    return logistic(parameter, datum[0])
+  end
+end
+
+def estimate_by_propensity(data, propensity_parameter, propensity_method, one)
   numerator = 0.0
   denominator = 0.0
   data.each{|datum|
-    propensity = logistic(theta, datum[0])
+    propensity = estimate_propensity(propensity_parameter, propensity_method, datum)
     correction = one ? propensity : 1.0-propensity
     numerator += datum[1]/correction
     denominator += 1.0/correction
@@ -77,11 +85,20 @@ def estimate_by_propensity(data, theta, one)
   numerator / denominator
 end
 
-def propensity(data)
-  theta = estimate_theta(data)
+def estimate_propensity_parameter(data, method)
+  if method == :const
+    return 1
+  elsif method == :logistic
+    return estimate_logistic_parameter(data)
+  end
+end
+
+def propensity(data, propensity_method)
+  propensity_parameter = estimate_propensity_parameter(data, propensity_method)
   zero = data.select{|datum| datum[2] == 0}
   one = data.select{|datum| datum[2] == 1}
-  estimate = [estimate_by_propensity(zero, theta, false), estimate_by_propensity(one, theta, true)]
+  estimate = [estimate_by_propensity(zero, propensity_parameter, propensity_method, false),
+              estimate_by_propensity(one,  propensity_parameter, propensity_method, true)]
   estimate << estimate[1] - estimate[0]
   estimate
 end
@@ -90,14 +107,14 @@ def linear(x, coeffs)
   coeffs[0]+coeffs[1]*x
 end
 
-def estimate_by_doubly_robust(data, theta, one)
+def estimate_by_doubly_robust(data, propensity_param, propensity_method, one)
   z = one ? 1 : 0
   regression_data = data.select{|datum| datum[2] == z}
   coeffs = estimate_regression_coeffs(regression_data)
   numerator = 0.0
   denominator = 0.0
   data.each{|datum|
-    propensity = logistic(theta, datum[0])
+    propensity = estimate_propensity(propensity_param, propensity_method, datum)
     regression = linear(datum[0], coeffs)
     correction = one ? propensity : 1.0-propensity
     if datum[2] == z
@@ -113,10 +130,10 @@ def estimate_by_doubly_robust(data, theta, one)
   numerator/data.length
 end
 
-def doubly_robust(data)
-  theta = estimate_theta(data)
-  estimate = [estimate_by_doubly_robust(data, theta, false),
-              estimate_by_doubly_robust(data, theta, true)]
+def doubly_robust(data, propensity_method)
+  propensity_parameter = estimate_propensity_parameter(data, propensity_method)
+  estimate = [estimate_by_doubly_robust(data, propensity_parameter, propensity_method, false),
+              estimate_by_doubly_robust(data, propensity_parameter, propensity_method, true)]
   estimate << estimate[1] - estimate[0]
   estimate
 end
@@ -136,9 +153,13 @@ def main(option)
   elsif method == "regression"
     result = regression(data)
   elsif method == "propensity"
-    result = propensity(data)
+    result = propensity(data, :logistic)
   elsif method == "doubly_robust"
-    result = doubly_robust(data)
+    result = doubly_robust(data, :logistic)
+  elsif method == "propensity_wrong"
+    result = propensity(data, :const)
+  elsif method == "doubly_robust_wrong"
+    result = doubly_robust(data, :const)
   end
   puts [method, result].flatten.join(", ")
 end
