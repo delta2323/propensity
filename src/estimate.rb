@@ -22,7 +22,7 @@ end
 def estimate_regression_coeffs(data)
   x_sum = data.map{|datum| datum[0]}.inject(:+)
   y_sum = data.map{|datum| datum[1]}.inject(:+)
-  x_sqr = data.map{|datum| x=datum[1]; x*x}.inject(:+)
+  x_sqr = data.map{|datum| x=datum[0]; x*x}.inject(:+)
   inner_prod = data.map{|datum| datum[0]*datum[1]}.inject(:+)
   n = data.length
   det = n*x_sqr - x_sum*x_sum
@@ -67,7 +67,8 @@ end
 
 def estimate_propensity(parameter, method, datum)
   if method == :const
-    return 1
+    return parameter
+#    return 0.1
   elsif method == :logistic
     return logistic(parameter, datum[0])
   end
@@ -85,9 +86,13 @@ def estimate_by_propensity(data, propensity_parameter, propensity_method, one)
   numerator / denominator
 end
 
+def estimate_const_parameter(data)
+  data.inject(0.0){|sum, datum| sum+datum[2]}/data.length
+end
+
 def estimate_propensity_parameter(data, method)
   if method == :const
-    return 1
+    return estimate_const_parameter(data)
   elsif method == :logistic
     return estimate_logistic_parameter(data)
   end
